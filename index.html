@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>Telegram JSON 聊天提取工具</title>
+  <title>Telegram 聊天 JSON 提取工具</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
@@ -78,10 +78,10 @@
 </head>
 <body>
   <div class="container">
-    <h2>🔍 Telegram 聊天 JSON 解析工具</h2>
+    <h2>🔍 Telegram 聊天 JSON 提取工具</h2>
 
-    <label for="jsonFile">📂 上传 messages.json 文件：</label><br>
-    <input type="file" id="jsonFile" accept=".json">
+    <label for="jsonFile">📂 上传消息文件（建议 messages.json）：</label><br>
+    <input type="file" id="jsonFile">
 
     <div class="search-bar">
       <label for="username">👤 用户名搜索：</label>
@@ -92,7 +92,7 @@
     <div class="button-group">
       <button onclick="extractEncrypted()">提取密文消息</button>
       <button onclick="copyResult()">复制结果</button>
-      <button onclick="downloadResult()">下载为txt</button>
+      <button onclick="downloadResult()">下载为 result.txt</button>
     </div>
 
     <textarea id="resultArea" placeholder="结果将在此显示..."></textarea>
@@ -115,16 +115,16 @@
       reader.onload = function (event) {
         try {
           jsonData = JSON.parse(event.target.result);
-          alert("✅ JSON 文件已成功加载！");
+          alert("✅ 文件已成功加载！");
         } catch (err) {
-          alert("❌ JSON 解析失败，请检查文件格式。");
+          alert("❌ 解析失败：请确认内容为有效 JSON！");
         }
       };
       reader.readAsText(file, 'utf-8');
     });
 
     function extractEncrypted() {
-      if (!jsonData) return alert("⚠️ 请先上传 JSON 文件！");
+      if (!jsonData) return alert("⚠️ 请先上传文件！");
       const result = jsonData.messages
         .filter(msg => typeof msg.text === "string" && encryptedKeywords.some(kw => msg.text.includes(kw)))
         .map(msg => `[${msg.date}] ${msg.from || '匿名'}: ${msg.text}`)
@@ -133,7 +133,7 @@
     }
 
     function searchByUsername() {
-      if (!jsonData) return alert("⚠️ 请先上传 JSON 文件！");
+      if (!jsonData) return alert("⚠️ 请先上传文件！");
       const username = document.getElementById("username").value.trim();
       if (!username) return alert("⚠️ 请输入用户名！");
       const result = jsonData.messages
