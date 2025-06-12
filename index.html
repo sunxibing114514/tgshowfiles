@@ -1,163 +1,153 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Telegram 聊天 JSON 提取工具</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f0f2f5;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 800px;
-      margin: 40px auto;
-      background: white;
-      border-radius: 10px;
-      padding: 30px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-    h2 {
-      text-align: center;
-      color: #333;
-      margin-bottom: 20px;
-    }
-    input[type="file"],
-    input[type="text"] {
-      padding: 8px;
-      font-size: 14px;
-      margin-top: 10px;
-    }
-    input[type="text"] {
-      width: 200px;
-    }
-    .button-group {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    button {
-      padding: 10px 16px;
-      font-size: 14px;
-      border: none;
-      border-radius: 5px;
-      background-color: #3b82f6;
-      color: white;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #2563eb;
-    }
-    textarea {
-      width: 100%;
-      height: 250px;
-      margin-top: 20px;
-      padding: 10px;
-      font-size: 14px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      resize: vertical;
-      font-family: monospace;
-      background: #f9f9f9;
-    }
-    label {
-      font-weight: 600;
-    }
-    .search-bar {
-      margin-top: 15px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-  </style>
+    <title>Telegram Chat Analyzer</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        input[type="file"] { margin-bottom: 10px; }
+        button { margin-right: 10px; }
+        textarea { width: 80%; height: 300px; margin-top: 10px; }
+        #downloadLink { display: none; margin-top: 10px; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h2>🔍 Telegram 聊天 JSON 提取工具</h2>
+    <h1>Telegram 聊天记录分析器</h1>
 
-    <label for="jsonFile">📂 上传消息文件（建议 messages.json）：</label><br>
-    <input type="file" id="jsonFile">
+    <input type="file" id="telegramFile" accept=".json">
+    <br>
+    <button onclick="extractSensitiveData()">提取密文</button>
+    <br><br>
+    <label for="usernameSearch">按用户名搜索:</label>
+    <input type="text" id="usernameSearch" placeholder="输入用户名">
+    <button onclick="searchByUser()">搜索</button>
 
-    <div class="search-bar">
-      <label for="username">👤 用户名搜索：</label>
-      <input type="text" id="username" placeholder="如：Alice">
-      <button onclick="searchByUsername()">搜索</button>
-    </div>
+    <h2>结果:</h2>
+    <textarea id="results" readonly></textarea>
+    <br>
+    <button onclick="copyResults()">复制结果</button>
+    <a id="downloadLink" href="#" download="result.txt">下载结果 (result.txt)</a>
 
-    <div class="button-group">
-      <button onclick="extractEncrypted()">提取密文消息</button>
-      <button onclick="copyResult()">复制结果</button>
-      <button onclick="downloadResult()">下载为 result.txt</button>
-    </div>
+    <script>
+        const sensitiveKeywords = [
+            "V_DataPanBot", "P_DataPanBot", "D_DataPanBot",
+            "v_FilesPan1Bot", "p_FilesPan1Bot", "d_FilesPan1Bot",
+            "vi_BAACAg", "v_BAACAg", "p_AgACAg", "d_BQACAg", "d_CgACAg",
+            "pk_1", "pk_2", "vid+", "pic+", "doc+",
+            "=_mda", "=_grp"
+        ];
 
-    <textarea id="resultArea" placeholder="结果将在此显示..."></textarea>
-  </div>
+        let chatData = null;
 
-  <script>
-    let jsonData = null;
+        document.getElementById('telegramFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        chatData = JSON.parse(e.target.result);
+                        alert("文件加载成功！");
+                    } catch (error) {
+                        alert("解析JSON文件失败，请确保上传的是有效的Telegram聊天记录JSON文件。");
+                        console.error("JSON parse error:", error);
+                        chatData = null;
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
 
-    const encryptedKeywords = [
-      "V_DataPanBot", "P_DataPanBot", "D_DataPanBot",
-      "v_FilesPan1Bot", "p_FilesPan1Bot", "d_FilesPan1Bot",
-      "vi_BAACAg", "v_BAACAg", "p_AgACAg", "d_BQACAg", "d_CgACAg",
-      "pk_1", "pk_2", "vid+", "pic+", "doc+", "=_mda", "=_grp"
-    ];
+        function extractSensitiveData() {
+            if (!chatData) {
+                alert("请先上传Telegram聊天记录文件。");
+                return;
+            }
 
-    document.getElementById('jsonFile').addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function (event) {
-        try {
-          jsonData = JSON.parse(event.target.result);
-          alert("✅ 文件已成功加载！");
-        } catch (err) {
-          alert("❌ 解析失败：请确认内容为有效 JSON！");
+            let sensitiveMessages = [];
+            if (chatData.messages) {
+                chatData.messages.forEach(message => {
+                    if (message.text) {
+                        let textContent = '';
+                        if (Array.isArray(message.text)) {
+                            // Handle cases where message.text is an array of strings and objects
+                            textContent = message.text.map(part => typeof part === 'string' ? part : part.text || '').join('');
+                        } else {
+                            textContent = message.text;
+                        }
+
+                        for (const keyword of sensitiveKeywords) {
+                            if (textContent.includes(keyword)) {
+                                sensitiveMessages.push(`消息ID: ${message.id}\n发送者: ${message.from || '未知'}\n日期: ${message.date}\n内容: ${textContent}\n`);
+                                break; // Only add message once even if multiple keywords are found
+                            }
+                        }
+                    }
+                });
+            }
+
+            displayResults(sensitiveMessages.join('\n---\n'));
         }
-      };
-      reader.readAsText(file, 'utf-8');
-    });
 
-    function extractEncrypted() {
-      if (!jsonData) return alert("⚠️ 请先上传文件！");
-      const result = jsonData.messages
-        .filter(msg => typeof msg.text === "string" && encryptedKeywords.some(kw => msg.text.includes(kw)))
-        .map(msg => `[${msg.date}] ${msg.from || '匿名'}: ${msg.text}`)
-        .join('\n');
-      document.getElementById("resultArea").value = result || "⚠️ 未找到密文消息。";
-    }
+        function searchByUser() {
+            if (!chatData) {
+                alert("请先上传Telegram聊天记录文件。");
+                return;
+            }
 
-    function searchByUsername() {
-      if (!jsonData) return alert("⚠️ 请先上传文件！");
-      const username = document.getElementById("username").value.trim();
-      if (!username) return alert("⚠️ 请输入用户名！");
-      const result = jsonData.messages
-        .filter(msg => msg.from && msg.from.toLowerCase().includes(username.toLowerCase()))
-        .map(msg => `[${msg.date}] ${msg.from}: ${typeof msg.text === "string" ? msg.text : JSON.stringify(msg.text)}`)
-        .join('\n');
-      document.getElementById("resultArea").value = result || "⚠️ 未找到该用户的消息。";
-    }
+            const username = document.getElementById('usernameSearch').value.trim();
+            if (!username) {
+                alert("请输入要搜索的用户名。");
+                return;
+            }
 
-    function copyResult() {
-      const area = document.getElementById("resultArea");
-      area.select();
-      document.execCommand("copy");
-      alert("✅ 结果已复制到剪贴板！");
-    }
+            let userMessages = [];
+            if (chatData.messages) {
+                chatData.messages.forEach(message => {
+                    // Check if 'from' field exists and matches the username
+                    if (message.from && message.from.toLowerCase() === username.toLowerCase()) {
+                        let textContent = '';
+                        if (Array.isArray(message.text)) {
+                            textContent = message.text.map(part => typeof part === 'string' ? part : part.text || '').join('');
+                        } else {
+                            textContent = message.text || '';
+                        }
+                        userMessages.push(`消息ID: ${message.id}\n日期: ${message.date}\n内容: ${textContent}\n`);
+                    } else if (message.actor && message.actor.toLowerCase() === username.toLowerCase()) {
+                        // For service messages where 'actor' might be the user
+                        let textContent = '';
+                        if (Array.isArray(message.text)) {
+                            textContent = message.text.map(part => typeof part === 'string' ? part : part.text || '').join('');
+                        } else {
+                            textContent = message.text || '';
+                        }
+                        userMessages.push(`消息ID: ${message.id}\n日期: ${message.date}\n内容: ${textContent} (作为事件发起者)\n`);
+                    }
+                });
+            }
 
-    function downloadResult() {
-      const text = document.getElementById("resultArea").value;
-      const blob = new Blob([text], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "result.txt";
-      link.click();
-    }
-  </script>
+            if (userMessages.length === 0) {
+                displayResults(`没有找到用户 "${username}" 的聊天记录。`);
+            } else {
+                displayResults(userMessages.join('\n---\n'));
+            }
+        }
+
+        function displayResults(text) {
+            const resultsField = document.getElementById('results');
+            resultsField.value = text;
+            const downloadLink = document.getElementById('downloadLink');
+            const blob = new Blob([text], { type: 'text/plain' });
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.style.display = 'inline-block'; // Show the download link
+        }
+
+        function copyResults() {
+            const resultsField = document.getElementById('results');
+            resultsField.select();
+            resultsField.setSelectionRange(0, 99999); // For mobile devices
+            document.execCommand("copy");
+            alert("结果已复制到剪贴板！");
+        }
+    </script>
 </body>
 </html>
